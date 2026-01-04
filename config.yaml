@@ -1,0 +1,155 @@
+# Volatility Path States - Configuration
+# =======================================
+
+# Data settings
+data:
+  start_date: '1963-01-01'
+  end_date: '2023-12-31'
+  training_end: '1999-12-31'
+  evaluation_start: '2000-01-01'
+  
+  # Universe filters
+  min_price: 1.0
+  min_market_cap_percentile: 20
+  min_return_history: 12
+  
+  # Data source: 'wrds', 'yahoo', 'synthetic'
+  source: 'synthetic'
+  
+  # WRDS credentials (if using WRDS)
+  wrds:
+    username: null  # Set via environment variable WRDS_USERNAME
+    
+# Regime classification settings
+regimes:
+  # Volatility level thresholds (percentiles)
+  vol_quantiles:
+    low: 0.33
+    high: 0.67
+    
+  # Volatility ratio thresholds
+  ratio_thresholds:
+    spike: 1.5
+    decay: 0.8
+    
+  # Volatility calculation horizons (trading days)
+  horizons:
+    short: 5      # 1 week
+    medium: 21    # 1 month
+    long: 63      # 3 months
+    extended: 126 # 6 months
+    
+  # Use expanding window for threshold estimation
+  expanding_window: true
+  
+# Factor construction settings
+factors:
+  # Momentum
+  momentum:
+    lookback: 12        # months
+    skip: 1             # skip most recent month
+    min_observations: 8 # minimum return observations
+    
+  # Value (book-to-market)
+  value:
+    lag_months: 6       # lag for accounting data
+    exclude_negative_be: true
+    
+  # Quality (gross profitability)
+  quality:
+    exclude_financials: true
+    financial_sic_codes: [6000, 6999]
+    
+  # Low-risk (beta)
+  low_risk:
+    lookback: 60        # months for beta estimation
+    min_observations: 36
+    winsorize_percentile: 1
+    
+  # Portfolio construction
+  portfolio:
+    n_quantiles: 10     # deciles
+    weighting: 'value'  # 'value' or 'equal'
+    breakpoints: 'nyse' # 'nyse' or 'all'
+    rebalance: 'monthly'
+    
+# State-conditioned portfolio settings
+portfolio:
+  # Regularization for exposure optimization
+  regularization: 0.5
+  
+  # Exposure bounds
+  min_exposure: 0.0
+  max_exposure: 1.0
+  
+  # Default exposure values by regime
+  default_exposures:
+    momentum:
+      calm_trend: 1.0
+      choppy_transition: 0.7
+      slow_burn_stress: 0.5
+      crash_spike: 0.0
+      recovery: 0.7
+    value:
+      calm_trend: 1.0
+      choppy_transition: 1.0
+      slow_burn_stress: 0.8
+      crash_spike: 0.4
+      recovery: 1.0
+    quality:
+      calm_trend: 1.0
+      choppy_transition: 1.0
+      slow_burn_stress: 1.0
+      crash_spike: 1.0
+      recovery: 0.85
+    low_risk:
+      calm_trend: 1.0
+      choppy_transition: 1.0
+      slow_burn_stress: 1.0
+      crash_spike: 1.0
+      recovery: 0.75
+      
+  # Transaction costs
+  transaction_costs:
+    baseline: 0.002     # 20 bps
+    conservative: 0.0035
+    high: 0.005
+    
+  # Risk scaling
+  target_volatility: 0.10  # 10% annualized
+  
+# Analysis settings
+analysis:
+  # Statistical tests
+  newey_west_lags: 12
+  bootstrap_replications: 1000
+  
+  # Performance metrics
+  risk_free_rate: 0.0   # or 'tbill' to use actual rates
+  annualization_factor: 12
+  
+  # Crash definition
+  crash_percentile: 5   # 5th percentile
+  
+# Output settings
+output:
+  figures_dir: 'output/figures'
+  tables_dir: 'output/tables'
+  results_dir: 'output/results'
+  
+  # Figure settings
+  figure_format: 'pdf'
+  figure_dpi: 300
+  
+  # Table settings
+  table_format: 'latex'
+  decimal_places: 2
+  
+# Logging settings
+logging:
+  level: 'INFO'
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: 'output/analysis.log'
+  
+# Random seed for reproducibility
+random_seed: 42
