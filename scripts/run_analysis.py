@@ -93,7 +93,7 @@ def parse_args():
 def load_data(config: Config, synthetic: bool = False, seed: int = 42):
     """Load or generate data."""
     logger.info("Loading data...")
-    
+
     if synthetic or config.data.source == 'synthetic':
         logger.info("Generating synthetic data...")
         generator = SyntheticDataGenerator(seed=seed)
@@ -107,6 +107,34 @@ def load_data(config: Config, synthetic: bool = False, seed: int = 42):
             start_date=config.data.start_date,
             end_date=config.data.end_date,
         )
+
+        # Filter to only the factors we analyze
+        # Core Fama-French 5-factor subset: MOM (Momentum), HML (Value), RMW (Quality)
+        # Note: Real data doesn't include BAB (Betting Against Beta) - would need to construct
+        available_factors = factors.columns.tolist()
+        logger.info(f"Available factors in data: {available_factors}")
+
+        # Define target factors in priority order
+        target_factors = ['MOM', 'HML', 'RMW']
+
+        # Filter to only target factors that exist
+        factors_to_keep = [f for f in target_factors if f in available_factors]
+
+        if not factors_to_keep:
+            raise ValueError(
+                f"No target factors found in data. "
+                f"Expected: {target_factors}, Available: {available_factors}"
+            )
+
+        if len(factors_to_keep) < len(target_factors):
+            missing = set(target_factors) - set(factors_to_keep)
+            logger.warning(
+                f"Missing factors: {missing}. Analysis will proceed with: {factors_to_keep}"
+            )
+
+        logger.info(f"Using factors for analysis: {factors_to_keep}")
+        factors = factors[factors_to_keep]
+
         return {
             'market': market,
             'factors': factors,
@@ -311,12 +339,39 @@ def generate_outputs(data: dict, regimes: pd.Series, vol_data: pd.DataFrame,
 def main():
     """Main entry point."""
     args = parse_args()
-    
+
+    # CRITICAL WARNINGS AT OUTSET
+    logger.warning("=" * 80)
+    logger.warning("⚠️  TEMPORARY LIMITATION: BAB (Betting Against Beta) factor removed")
+    logger.warning("   - Currently using only 3 factors: MOM (Momentum), HML (Value), RMW (Quality)")
+    logger.warning("   - BAB not available in French factor library")
+    logger.warning("   - Need to construct from individual stock data or find alternative source")
+    logger.warning("=" * 80)
+    logger.warning("")
+    logger.warning("=" * 80)
+    logger.warning("⚠️  POTENTIAL LOOK-AHEAD BIAS - REQUIRES VERIFICATION")
+    logger.warning("   Data Timestamp Issue:")
+    logger.warning("   - French factors: index 'YYYY-MM-01' but returns EARNED during that month")
+    logger.warning("   - Available only at MONTH END, not month start")
+    logger.warning("   - Volatility: correctly timestamped at month-end")
+    logger.warning("")
+    logger.warning("   Current Behavior:")
+    logger.warning("   - Aligns by month PERIOD (treats Jan-01 and Jan-31 as same month)")
+    logger.warning("   - Uses month t regime to condition month t return")
+    logger.warning("")
+    logger.warning("   Implication:")
+    logger.warning("   - IF TRADING STRATEGY: This is LOOK-AHEAD BIAS (regime must be lagged)")
+    logger.warning("   - IF CONDITIONAL STATISTICS: This is OK (analyzing realized relationships)")
+    logger.warning("")
+    logger.warning("   See LOOK_AHEAD_BIAS_ANALYSIS.md for full details")
+    logger.warning("=" * 80)
+    logger.warning("")
+
     logger.info("=" * 60)
     logger.info("Volatility Path States Analysis")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("=" * 60)
-    
+
     # Load configuration
     config_path = Path(args.config)
     if config_path.exists():

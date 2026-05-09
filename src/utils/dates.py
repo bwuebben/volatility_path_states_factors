@@ -170,13 +170,13 @@ def resample_to_monthly(
         Monthly data.
     """
     if agg_func == 'last':
-        return daily_data.resample('M').last()
+        return daily_data.resample('ME').last()
     elif agg_func == 'first':
-        return daily_data.resample('M').first()
+        return daily_data.resample('ME').first()
     elif agg_func == 'mean':
-        return daily_data.resample('M').mean()
+        return daily_data.resample('ME').mean()
     elif agg_func == 'sum':
-        return daily_data.resample('M').sum()
+        return daily_data.resample('ME').sum()
     else:
         raise ValueError(f"Unknown aggregation function: {agg_func}")
 

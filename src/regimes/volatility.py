@@ -112,7 +112,7 @@ class VolatilityCalculator:
         
         # Resample to monthly if requested
         if not return_daily:
-            vol_df = vol_df.resample('M').last()
+            vol_df = vol_df.resample('ME').last()
             
         return vol_df
     

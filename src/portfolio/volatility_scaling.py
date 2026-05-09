@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 class VolatilityScaledPortfolio:
     """
     Volatility-managed factor portfolio.
-    
+
     Implements the volatility scaling approach of Moreira and Muir (2017),
     which adjusts factor exposure inversely with trailing realized volatility.
-    
+
     Parameters
     ----------
     factor_returns : pd.DataFrame
@@ -252,10 +252,10 @@ class VolatilityScaledPortfolio:
 class VolatilityLevelConditionedPortfolio:
     """
     Portfolio conditioned on volatility level only (not path).
-    
+
     This is used as a comparison benchmark to isolate the value
     of path information beyond volatility levels.
-    
+
     Parameters
     ----------
     factor_returns : pd.DataFrame
@@ -267,7 +267,15 @@ class VolatilityLevelConditionedPortfolio:
     transaction_cost : float, default 0.002
         Transaction cost.
     """
-    
+
+    # Factor name mapping
+    FACTOR_NAME_MAP = {
+        'MOM': 'Momentum',
+        'HML': 'Value',
+        'RMW': 'Quality',
+        'BAB': 'Low-Risk',
+    }
+
     def __init__(
         self,
         factor_returns: pd.DataFrame,
@@ -280,16 +288,34 @@ class VolatilityLevelConditionedPortfolio:
         self.volatility = volatility.copy()
         self.quantiles = quantiles
         self.transaction_cost = transaction_cost
-        
+
         self.factor_names = list(factor_returns.columns)
-        
-        # Default exposures by volatility level
-        self.exposures = {
+
+        # Default exposures by volatility level (using semantic names)
+        default_exposures_template = {
             'Momentum': {'low': 1.0, 'medium': 0.7, 'high': 0.3},
             'Value': {'low': 1.0, 'medium': 1.0, 'high': 0.6},
             'Quality': {'low': 1.0, 'medium': 1.0, 'high': 1.0},
             'Low-Risk': {'low': 1.0, 'medium': 1.0, 'high': 1.0},
         }
+
+        # Map exposures to actual factor names in data
+        self.exposures = {}
+        for factor in self.factor_names:
+            # Try direct lookup
+            if factor in default_exposures_template:
+                self.exposures[factor] = default_exposures_template[factor].copy()
+            # Try mapping abbreviated name
+            elif factor in self.FACTOR_NAME_MAP:
+                mapped = self.FACTOR_NAME_MAP[factor]
+                if mapped in default_exposures_template:
+                    self.exposures[factor] = default_exposures_template[mapped].copy()
+                else:
+                    # Default to full exposure
+                    self.exposures[factor] = {'low': 1.0, 'medium': 1.0, 'high': 1.0}
+            else:
+                # Default to full exposure for unknown factors
+                self.exposures[factor] = {'low': 1.0, 'medium': 1.0, 'high': 1.0}
         
     def classify_vol_level(
         self,

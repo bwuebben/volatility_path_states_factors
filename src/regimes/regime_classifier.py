@@ -316,12 +316,39 @@ class RegimeClassifier:
             
             # Add factor return statistics if provided
             if factor_returns is not None:
-                aligned_returns = factor_returns.loc[mask]
+                # Align by month period (handle different day-of-month conventions)
+                # Convert both to period index for alignment
+                factor_period_idx = factor_returns.index.to_period('M')
+                states_period_idx = states.index.to_period('M')
+
+                # Find common months
+                common_periods = factor_period_idx.intersection(states_period_idx)
+
+                # Filter to common months
+                factor_in_common = factor_returns.iloc[
+                    [i for i, p in enumerate(factor_period_idx) if p in common_periods]
+                ]
+                states_mask_periods = states.index.to_period('M').isin(common_periods)
+                regime_mask_aligned = mask & states_mask_periods
+
+                # Get factor returns for this regime
+                aligned_returns = factor_in_common.iloc[
+                    [i for i, (p, m) in enumerate(zip(states.index.to_period('M'), mask))
+                     if m and p in common_periods]
+                ]
+
                 for col in aligned_returns.columns:
-                    stat[f'{col}_mean'] = aligned_returns[col].mean() * 100
-                    stat[f'{col}_sharpe'] = (
-                        aligned_returns[col].mean() / aligned_returns[col].std() * np.sqrt(12)
-                    )
+                    if len(aligned_returns) > 0:
+                        stat[f'{col}_mean'] = aligned_returns[col].mean() * 100
+                        if aligned_returns[col].std() > 0:
+                            stat[f'{col}_sharpe'] = (
+                                aligned_returns[col].mean() / aligned_returns[col].std() * np.sqrt(12)
+                            )
+                        else:
+                            stat[f'{col}_sharpe'] = np.nan
+                    else:
+                        stat[f'{col}_mean'] = np.nan
+                        stat[f'{col}_sharpe'] = np.nan
             
             stats.append(stat)
         

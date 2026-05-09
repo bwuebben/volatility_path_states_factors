@@ -155,29 +155,56 @@ class FigureGenerator:
         self,
         factor_returns: pd.DataFrame,
         regimes: pd.Series,
-        factor: str = 'Momentum',
+        factor: Optional[str] = None,
         save: bool = True,
     ) -> plt.Figure:
         """
         Generate Figure 2: Cumulative Performance Comparison.
-        
+
         Parameters
         ----------
         factor_returns : pd.DataFrame
             Factor returns.
         regimes : pd.Series
             Regime classification.
-        factor : str, default 'Momentum'
-            Factor to plot.
+        factor : str, optional
+            Factor to plot. If None, uses first momentum-like factor.
         save : bool, default True
             Whether to save.
-            
+
         Returns
         -------
         matplotlib.figure.Figure
+
+        Raises
+        ------
+        ValueError
+            If no valid factor column is found.
         """
+        # Auto-detect factor name if not provided
+        if factor is None:
+            # Try common momentum factor names
+            for name in ['MOM', 'Momentum']:
+                if name in factor_returns.columns:
+                    factor = name
+                    break
+            # If still not found, use first available column
+            if factor is None:
+                if len(factor_returns.columns) > 0:
+                    factor = factor_returns.columns[0]
+                    logger.warning(f"No momentum factor found. Using first column: {factor}")
+                else:
+                    raise ValueError("No factor columns found in factor_returns DataFrame")
+
+        # Validate factor exists
+        if factor not in factor_returns.columns:
+            raise ValueError(
+                f"Factor '{factor}' not found in data. "
+                f"Available factors: {list(factor_returns.columns)}"
+            )
+
         fig, ax = plt.subplots(figsize=(10, 5))
-        
+
         # Align data
         common_idx = factor_returns.index.intersection(regimes.index)
         returns = factor_returns.loc[common_idx, factor]
@@ -195,6 +222,9 @@ class FigureGenerator:
             'Recovery': 0.7,
         }
         exposure = reg.map(exposures)
+        # Ensure timezone compatibility
+        if hasattr(exposure.index, 'tz') and exposure.index.tz is not None:
+            exposure.index = exposure.index.tz_localize(None)
         cond_returns = returns * exposure
         cum_cond = np.cumsum(cond_returns) * 100
         
@@ -502,6 +532,9 @@ class FigureGenerator:
             'Slow-Burn Stress': 0.5, 'Crash-Spike': 0.0, 'Recovery': 0.7,
         }
         exposure = reg.map(exposures)
+        # Ensure timezone compatibility
+        if hasattr(exposure.index, 'tz') and exposure.index.tz is not None:
+            exposure.index = exposure.index.tz_localize(None)
         cond_returns = returns * exposure
         cum_cond = np.cumsum(cond_returns)
         running_max_cond = np.maximum.accumulate(cum_cond)
@@ -517,12 +550,13 @@ class FigureGenerator:
         ax1.axhline(y=0, color='black', linewidth=0.5)
         
         # Annotate max drawdown
-        max_dd_idx = dd_uncond.idxmax()
-        ax1.annotate(f'Max DD: {dd_uncond.max():.1f}%',
-                    xy=(max_dd_idx, -dd_uncond.max()),
-                    xytext=(max_dd_idx, -dd_uncond.max() - 15),
-                    fontsize=9, ha='center',
-                    arrowprops=dict(arrowstyle='->', color='black', lw=0.5))
+        if len(dd_uncond) > 0 and dd_uncond.max() > 0:
+            max_dd_idx = dd_uncond.idxmax()
+            ax1.annotate(f'Max DD: {dd_uncond.max():.1f}%',
+                        xy=(max_dd_idx, -dd_uncond.max()),
+                        xytext=(max_dd_idx, -dd_uncond.max() - 15),
+                        fontsize=9, ha='center',
+                        arrowprops=dict(arrowstyle='->', color='black', lw=0.5))
         
         # Panel B: State-Conditioned
         ax2 = axes[1]
@@ -534,12 +568,13 @@ class FigureGenerator:
         ax2.set_ylim([-80, 5])
         ax2.axhline(y=0, color='black', linewidth=0.5)
         
-        max_dd_idx_cond = dd_cond.idxmax()
-        ax2.annotate(f'Max DD: {dd_cond.max():.1f}%',
-                    xy=(max_dd_idx_cond, -dd_cond.max()),
-                    xytext=(max_dd_idx_cond, -dd_cond.max() - 15),
-                    fontsize=9, ha='center',
-                    arrowprops=dict(arrowstyle='->', color='black', lw=0.5))
+        if len(dd_cond) > 0 and dd_cond.max() > 0:
+            max_dd_idx_cond = dd_cond.idxmax()
+            ax2.annotate(f'Max DD: {dd_cond.max():.1f}%',
+                        xy=(max_dd_idx_cond, -dd_cond.max()),
+                        xytext=(max_dd_idx_cond, -dd_cond.max() - 15),
+                        fontsize=9, ha='center',
+                        arrowprops=dict(arrowstyle='->', color='black', lw=0.5))
         
         plt.tight_layout()
         
@@ -552,43 +587,74 @@ class FigureGenerator:
         self,
         factor_returns: pd.DataFrame,
         regimes: pd.Series,
-        factors: List[str] = ['Momentum', 'Quality'],
+        factors: Optional[List[str]] = None,
         save: bool = True,
     ) -> plt.Figure:
         """
         Generate Figure 7: Regime Classification and Factor Performance.
-        
+
         Parameters
         ----------
         factor_returns : pd.DataFrame
             Factor returns.
         regimes : pd.Series
             Regime classification.
-        factors : list
-            Factors to plot.
+        factors : list, optional
+            Factors to plot. If None, uses first two available factors.
         save : bool, default True
             Whether to save.
-            
+
         Returns
         -------
         matplotlib.figure.Figure
         """
+        # Auto-detect factor names if not provided
+        if factors is None:
+            factors = []
+            # Try to find Momentum and Quality factors (as in paper)
+            for name in ['MOM', 'Momentum']:
+                if name in factor_returns.columns:
+                    factors.append(name)
+                    break
+            for name in ['RMW', 'Quality']:
+                if name in factor_returns.columns:
+                    factors.append(name)
+                    break
+
+            # If we didn't find 2 factors, use first available columns
+            if len(factors) < 2:
+                for col in factor_returns.columns:
+                    if col not in factors:
+                        factors.append(col)
+                        if len(factors) >= 2:
+                            break
+
+            # Validate we have at least some factors
+            if len(factors) == 0:
+                raise ValueError("No factor columns found in factor_returns DataFrame")
+
+            if len(factors) < 2:
+                logger.warning(f"Only {len(factors)} factor(s) found for Figure 7. Expected 2.")
+
         n_panels = 1 + len(factors)
         fig, axes = plt.subplots(n_panels, 1, figsize=(12, 2 + 3*len(factors)),
                                 height_ratios=[0.3] + [1]*len(factors))
-        
+
         common_idx = factor_returns.index.intersection(regimes.index)
         returns = factor_returns.loc[common_idx]
         reg = regimes.loc[common_idx]
-        
+
         # Panel A: Regime classification
         ax1 = axes[0]
-        for i in range(len(reg.index) - 1):
-            regime = reg.iloc[i]
-            ax1.axvspan(reg.index[i], reg.index[i+1], alpha=0.8,
-                       color=PlotStyles.get_regime_color(regime), linewidth=0)
-        
-        ax1.set_xlim([reg.index[0], reg.index[-1]])
+        if len(reg) > 0:
+            for i in range(len(reg.index) - 1):
+                regime = reg.iloc[i]
+                ax1.axvspan(reg.index[i], reg.index[i+1], alpha=0.8,
+                           color=PlotStyles.get_regime_color(regime), linewidth=0)
+
+            ax1.set_xlim([reg.index[0], reg.index[-1]])
+        else:
+            ax1.set_xlim([0, 1])
         ax1.set_ylim([0, 1])
         ax1.set_yticks([])
         ax1.set_title('Panel A: Regime Classification', fontweight='bold')
@@ -607,7 +673,8 @@ class FigureGenerator:
                    color=PlotStyles.get_factor_color(factor), linewidth=1.5)
             ax.set_ylabel('Cumulative Return (%)')
             ax.set_title(f'Panel {chr(66+idx)}: {factor} Factor', fontweight='bold')
-            ax.set_xlim([reg.index[0], reg.index[-1]])
+            if len(reg) > 0:
+                ax.set_xlim([reg.index[0], reg.index[-1]])
             
             if idx == len(factors) - 1:
                 ax.set_xlabel('Date')
@@ -739,7 +806,19 @@ class FigureGenerator:
             self.figure5_ic_timeseries(ic, regimes)
         
         # Figure 6: Drawdown
-        self.figure6_drawdown(factors['Momentum'], regimes)
+        # Auto-detect first available momentum factor
+        factor_col = None
+        for name in ['MOM', 'Momentum']:
+            if name in factors.columns:
+                factor_col = name
+                break
+        if factor_col is None:
+            if len(factors.columns) > 0:
+                factor_col = factors.columns[0]
+                logger.warning(f"No momentum factor found for Figure 6. Using: {factor_col}")
+            else:
+                raise ValueError("No factor columns found in data for Figure 6")
+        self.figure6_drawdown(factors[factor_col], regimes)
         
         # Figure 7: Regime factor panel
         self.figure7_regime_factor_panel(factors, regimes)

@@ -41,7 +41,7 @@ class SyntheticDataGenerator:
     >>> generator = SyntheticDataGenerator(seed=42)
     >>> data = generator.generate(n_months=732)
     >>> print(data['factors'].columns)
-    Index(['Momentum', 'Value', 'Quality', 'Low-Risk'], dtype='object')
+    Index(['MOM', 'HML', 'RMW'], dtype='object')
     """
     
     # Regime names
@@ -54,66 +54,54 @@ class SyntheticDataGenerator:
     ]
     
     # State-conditional return parameters (mean, std) for each factor
+    # Using standard Fama-French naming: MOM (Momentum), HML (Value), RMW (Quality)
+    # Note: Only using 3 factors to match what's available in French data library
     RETURN_PARAMS = {
-        'Momentum': {
+        'MOM': {
             'Calm Trend': (0.0142, 0.04),
             'Choppy Transition': (0.0078, 0.05),
             'Slow-Burn Stress': (0.0022, 0.06),
             'Crash-Spike': (-0.0385, 0.10),
             'Recovery': (0.0095, 0.055)
         },
-        'Value': {
+        'HML': {
             'Calm Trend': (0.0038, 0.03),
             'Choppy Transition': (0.0042, 0.035),
             'Slow-Burn Stress': (0.0055, 0.04),
             'Crash-Spike': (-0.0082, 0.07),
             'Recovery': (0.0128, 0.045)
         },
-        'Quality': {
+        'RMW': {
             'Calm Trend': (0.0035, 0.02),
             'Choppy Transition': (0.0028, 0.022),
             'Slow-Burn Stress': (0.0048, 0.025),
             'Crash-Spike': (0.0072, 0.05),
             'Recovery': (0.0018, 0.028)
-        },
-        'Low-Risk': {
-            'Calm Trend': (0.0022, 0.018),
-            'Choppy Transition': (0.0018, 0.02),
-            'Slow-Burn Stress': (0.0035, 0.025),
-            'Crash-Spike': (0.0045, 0.045),
-            'Recovery': (-0.0015, 0.025)
         }
     }
     
     # State-conditional IC parameters
     IC_PARAMS = {
-        'Momentum': {
+        'MOM': {
             'Calm Trend': (0.048, 0.02),
             'Choppy Transition': (0.032, 0.025),
             'Slow-Burn Stress': (0.015, 0.03),
             'Crash-Spike': (-0.052, 0.05),
             'Recovery': (0.028, 0.035)
         },
-        'Value': {
+        'HML': {
             'Calm Trend': (0.022, 0.015),
             'Choppy Transition': (0.020, 0.018),
             'Slow-Burn Stress': (0.025, 0.02),
             'Crash-Spike': (0.012, 0.04),
             'Recovery': (0.038, 0.025)
         },
-        'Quality': {
+        'RMW': {
             'Calm Trend': (0.028, 0.012),
             'Choppy Transition': (0.025, 0.015),
             'Slow-Burn Stress': (0.032, 0.018),
             'Crash-Spike': (0.038, 0.03),
             'Recovery': (0.022, 0.02)
-        },
-        'Low-Risk': {
-            'Calm Trend': (0.015, 0.012),
-            'Choppy Transition': (0.012, 0.015),
-            'Slow-Burn Stress': (0.018, 0.018),
-            'Crash-Spike': (0.025, 0.03),
-            'Recovery': (0.008, 0.02)
         }
     }
     
@@ -333,20 +321,21 @@ class SyntheticDataGenerator:
         regimes: np.ndarray,
     ) -> Dict[str, np.ndarray]:
         """Generate factor returns based on regime."""
-        factors = ['Momentum', 'Value', 'Quality', 'Low-Risk']
+        # Use standard Fama-French factor names (matching real data availability)
+        factors = ['MOM', 'HML', 'RMW']
         returns = {f: np.zeros(n_months) for f in factors}
-        
+
         for t in range(n_months):
             regime = regimes[t]
             for factor in factors:
                 mean, std = self.RETURN_PARAMS[factor][regime]
-                
+
                 # Add negative skewness for momentum in crash states
-                if factor == 'Momentum' and regime == 'Crash-Spike':
+                if factor == 'MOM' and regime == 'Crash-Spike':
                     returns[factor][t] = mean + std * (np.random.normal(0, 1) - 0.5)
                 else:
                     returns[factor][t] = np.random.normal(mean, std)
-        
+
         return returns
     
     def _generate_market_returns(
@@ -385,15 +374,16 @@ class SyntheticDataGenerator:
         regimes: np.ndarray,
     ) -> Dict[str, np.ndarray]:
         """Generate information coefficients for each factor."""
-        factors = ['Momentum', 'Value', 'Quality', 'Low-Risk']
+        # Use standard Fama-French factor names (matching real data availability)
+        factors = ['MOM', 'HML', 'RMW']
         ics = {f: np.zeros(n_months) for f in factors}
-        
+
         for t in range(n_months):
             regime = regimes[t]
             for factor in factors:
                 mean, std = self.IC_PARAMS[factor][regime]
                 ics[factor][t] = np.random.normal(mean, std)
-        
+
         return ics
     
     def _generate_daily_returns(

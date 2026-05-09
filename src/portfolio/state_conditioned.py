@@ -54,7 +54,21 @@ class StateConditionedPortfolio:
     >>> print(result.returns['net'].mean() * 12)
     """
     
+    # Factor name mapping: standardized names -> display names
+    FACTOR_NAME_MAP = {
+        'MOM': 'Momentum',
+        'HML': 'Value',
+        'RMW': 'Quality',
+        'BAB': 'Low-Risk',
+        # Reverse mapping
+        'Momentum': 'Momentum',
+        'Value': 'Value',
+        'Quality': 'Quality',
+        'Low-Risk': 'Low-Risk',
+    }
+
     # Default exposure values from the paper
+    # Using semantic names (Momentum, Value, etc.) for clarity
     DEFAULT_EXPOSURES = {
         'Momentum': {
             'Calm Trend': 1.0,
@@ -122,8 +136,17 @@ class StateConditionedPortfolio:
         """Get default exposures, filling in for unknown factors."""
         exposures = {}
         for factor in self.factor_names:
+            # Try direct lookup first
             if factor in self.DEFAULT_EXPOSURES:
                 exposures[factor] = self.DEFAULT_EXPOSURES[factor].copy()
+            # Try mapping abbreviated name to full name
+            elif factor in self.FACTOR_NAME_MAP:
+                mapped_name = self.FACTOR_NAME_MAP[factor]
+                if mapped_name in self.DEFAULT_EXPOSURES:
+                    exposures[factor] = self.DEFAULT_EXPOSURES[mapped_name].copy()
+                else:
+                    # Default to full exposure for unknown factors
+                    exposures[factor] = {r: 1.0 for r in self.REGIME_ORDER}
             else:
                 # Default to full exposure for unknown factors
                 exposures[factor] = {r: 1.0 for r in self.REGIME_ORDER}
@@ -260,6 +283,9 @@ class StateConditionedPortfolio:
             exposure_series = self.regimes.map(
                 lambda r: self.get_exposure(factor, r)
             )
+            # Ensure timezone compatibility
+            if hasattr(exposure_series.index, 'tz') and exposure_series.index.tz is not None:
+                exposure_series.index = exposure_series.index.tz_localize(None)
             effective[factor] = self.factor_returns[factor] * exposure_series
         
         return effective
@@ -354,13 +380,18 @@ class StateConditionedPortfolio:
     
     def _get_exposure_series(self) -> pd.DataFrame:
         """Get exposure values over time."""
-        exposures = pd.DataFrame(index=self.regimes.index)
-        
+        # Ensure timezone-naive index to match factor_returns
+        index = self.regimes.index
+        if hasattr(index, 'tz') and index.tz is not None:
+            index = index.tz_localize(None)
+
+        exposures = pd.DataFrame(index=index)
+
         for factor in self.factor_names:
             exposures[factor] = self.regimes.map(
                 lambda r: self.get_exposure(factor, r)
-            )
-        
+            ).values  # Use .values to avoid index alignment issues
+
         return exposures
     
     def compare_with_baseline(

@@ -222,7 +222,7 @@ class PathStateClassifier:
         daily_states = self.compute_states(daily_returns, prices)
         
         # Resample to monthly (end of month values)
-        monthly_states = daily_states.resample('M').last()
+        monthly_states = daily_states.resample('ME').last()
         
         return monthly_states
     

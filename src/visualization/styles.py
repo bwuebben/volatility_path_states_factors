@@ -33,14 +33,16 @@ class PlotStyles:
     
     # Factor colors
     FACTOR_COLORS = {
+        # Full names (legacy)
         'Momentum': '#E63946',   # Red
         'Value': '#2E86AB',      # Blue
         'Quality': '#2A9D8F',    # Teal
         'Low-Risk': '#9B5DE5',   # Purple
-        'MOM': '#E63946',
-        'HML': '#2E86AB',
-        'RMW': '#2A9D8F',
-        'BAB': '#9B5DE5',
+        # Abbreviated names (standard Fama-French)
+        'MOM': '#E63946',        # Momentum - Red
+        'HML': '#2E86AB',        # High Minus Low (Value) - Blue
+        'RMW': '#2A9D8F',        # Robust Minus Weak (Quality) - Teal
+        'BAB': '#9B5DE5',        # Betting Against Beta (Low-Risk) - Purple
     }
     
     # Canonical regime ordering

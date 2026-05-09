@@ -14,8 +14,9 @@ data:
   min_return_history: 12
   
   # Data source: 'wrds', 'yahoo', 'synthetic'
-  source: 'synthetic'
-  
+  #source: 'synthetic'
+  source: 'yahoo'
+
   # WRDS credentials (if using WRDS)
   wrds:
     username: null  # Set via environment variable WRDS_USERNAME

@@ -185,15 +185,19 @@ class FrenchDataLoader(DataLoader):
         if cached is not None:
             return cached.loc[start_date:end_date]
         
-        # Download factors
-        ff3 = pdr.get_data_famafrench('F-F_Research_Data_Factors', start='1926')[0]
-        ff5 = pdr.get_data_famafrench('F-F_Research_Data_5_Factors_2x3', start='1963')[0]
-        mom = pdr.get_data_famafrench('F-F_Momentum_Factor', start='1926')[0]
+        # Download factors (suppress date_parser FutureWarning from pandas_datareader)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=FutureWarning,
+                                  message='.*date_parser.*')
+            ff3 = pdr.get_data_famafrench('F-F_Research_Data_Factors', start='1926')[0]
+            ff5 = pdr.get_data_famafrench('F-F_Research_Data_5_Factors_2x3', start='1963')[0]
+            mom = pdr.get_data_famafrench('F-F_Momentum_Factor', start='1926')[0]
         
         # Process indices
-        ff3.index = pd.to_datetime(ff3.index.astype(str), format='%Y%m')
-        ff5.index = pd.to_datetime(ff5.index.astype(str), format='%Y%m')
-        mom.index = pd.to_datetime(mom.index.astype(str), format='%Y%m')
+        ff3.index = pd.to_datetime(ff3.index.astype(str), format='%Y-%m')
+        ff5.index = pd.to_datetime(ff5.index.astype(str), format='%Y-%m')
+        mom.index = pd.to_datetime(mom.index.astype(str), format='%Y-%m')
         
         # Convert to decimal
         ff3 = ff3 / 100
@@ -279,22 +283,26 @@ class YahooDataLoader(DataLoader):
             import yfinance as yf
         except ImportError:
             raise ImportError("yfinance required. Install with: pip install yfinance")
-        
+
         # Download data
         ticker = yf.Ticker(self.market_ticker)
         hist = ticker.history(start=start_date, end=end_date)
-        
+
         # Compute returns
         returns = hist['Close'].pct_change().dropna()
-        
+
+        # Remove timezone to match French data
+        if hasattr(returns.index, 'tz') and returns.index.tz is not None:
+            returns.index = returns.index.tz_localize(None)
+
         # Monthly aggregation
-        monthly_returns = (1 + returns).resample('M').prod() - 1
-        
+        monthly_returns = (1 + returns).resample('ME').prod() - 1
+
         market_data = pd.DataFrame({
             'market_return': monthly_returns,
             'risk_free_rate': 0.0,  # Placeholder
         })
-        
+
         return market_data
     
     def load_factor_returns(
@@ -321,18 +329,22 @@ class YahooDataLoader(DataLoader):
             import yfinance as yf
         except ImportError:
             raise ImportError("yfinance required. Install with: pip install yfinance")
-        
+
         # Download data
         ticker = yf.Ticker(self.market_ticker)
         hist = ticker.history(start=start_date, end=end_date)
-        
+
         # Compute returns
         returns = hist['Close'].pct_change().dropna()
-        
+
+        # Remove timezone to match French data (which has no timezone)
+        if hasattr(returns.index, 'tz') and returns.index.tz is not None:
+            returns.index = returns.index.tz_localize(None)
+
         daily_data = pd.DataFrame({
             'market_return': returns,
         })
-        
+
         return daily_data
 
 
